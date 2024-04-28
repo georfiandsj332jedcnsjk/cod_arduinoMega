@@ -1,0 +1,210 @@
+#include <Servo.h>
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+
+#define echoPinIN1 2
+#define trigPinIN1 3
+#define echoPinIN2 7
+#define trigPinIN2 8
+#define echoPinOUT1 9
+#define trigPinOUT1 10
+#define echoPinOUT2 11
+#define trigPinOUT2 12
+
+#define NUM_SENSORS 4
+
+const int trigPins[NUM_SENSORS] = {22, 24, 26, 28}; // Modificați aceste pini la pini compatibili cu Arduino Mega
+const int echoPins[NUM_SENSORS] = {23, 25, 27, 29}; // Modificați aceste pini la pini compatibili cu Arduino Mega
+
+Servo servo_intrare;
+Servo servo_iesire;
+LiquidCrystal_I2C lcd(0x27, 16, 2); // Inițializați LCD-ul I2C cu adresa 0x27 și dimensiunile 16x2
+
+long durationIN1;
+int distanceIN1;
+long durationIN2;
+int distanceIN2;
+long durationOUT1;
+int distanceOUT1;
+long durationOUT2;
+int distanceOUT2;
+int nrlocurilibere = 4;
+int conditieintrare1 = 0, conditieintrare2 = 0, conditieiesire1 = 0, conditieiesire2 = 0;
+
+void setup() {
+  servo_intrare.attach(13);
+  servo_iesire.attach(4);
+  pinMode(trigPinIN1, OUTPUT);
+  pinMode(echoPinIN1, INPUT);
+  pinMode(trigPinIN2, OUTPUT);
+  pinMode(echoPinIN2, INPUT);
+  pinMode(trigPinOUT1, OUTPUT);
+  pinMode(echoPinOUT1, INPUT);
+  pinMode(trigPinOUT2, OUTPUT);
+  pinMode(echoPinOUT2, INPUT);
+  Serial.begin(9600);
+  lcd.init(); // Inițializați LCD-ul
+  lcd.backlight(); // Porniți iluminarea din spate a LCD-ului
+  delay(1000);
+
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    pinMode(trigPins[i], OUTPUT);
+    pinMode(echoPins[i], INPUT);
+  }
+}
+
+void updateLCD(int numSpaces) {
+  lcd.clear(); // Ștergeți afișajul
+  if (numSpaces == 0) {
+    lcd.setCursor(0, 0);
+    lcd.print("Parcarea este");
+    lcd.setCursor(0, 1);
+    lcd.print("plina");
+  } else {
+    lcd.setCursor(0, 0);
+    lcd.print("Locuri libere:");
+    lcd.setCursor(0, 1);
+    lcd.print(numSpaces);
+  }
+}
+
+void loop() {
+  distanceIN1 = calculDistantaIN1();
+  distanceIN2 = calculDistantaIN2();
+  distanceOUT1 = calculDistantaOUT1();
+  distanceOUT2 = calculDistantaOUT2();
+
+  // Pentru poarta de intrare
+  if (distanceIN1 <= 6 && distanceIN2 > 6 && nrlocurilibere >= 1) {
+    ridicarebarieraintrare();
+    conditieintrare1 = 1;
+    delay(100);
+  }
+
+  if (distanceIN1 > 6 && distanceIN2 <= 6) {
+    coborarebarieraintrare();
+    if (conditieintrare1 == 1)
+      conditieintrare2 = 1;
+    delay(100);
+  }
+
+  if (conditieintrare1 == 1 && conditieintrare2 == 1) {
+    nrlocurilibere = nrlocurilibere - 1;
+    conditieintrare1 = 0;
+    conditieintrare2 = 0;
+    Serial.println(nrlocurilibere);
+
+  }
+
+  // Pentru poarta de la iesire
+  if (distanceOUT1 <= 6 && distanceOUT2 > 6) {
+    ridicarebarieraiesire();
+    conditieiesire1 = 1;
+    delay(100);
+  }
+
+  if (distanceOUT1 > 6 && distanceOUT2 <= 6) {
+    coborarebarieraiesire();
+    if (conditieiesire1 == 1)
+      conditieiesire2 = 1;
+    delay(100);
+  }
+
+  if (conditieiesire1 == 1 && conditieiesire2 == 1) {
+    nrlocurilibere = nrlocurilibere + 1;
+    if (nrlocurilibere > 4)
+      nrlocurilibere = 4;
+    conditieiesire1 = 0;
+    conditieiesire2 = 0;
+    Serial.println(nrlocurilibere);
+
+  }
+
+  // Actualizați afișajul LCD cu numărul de locuri libere
+  updateLCD(nrlocurilibere);
+
+  for (int i = 0; i < NUM_SENSORS; i++) {
+    long duration = measureDistance(trigPins[i], echoPins[i]);
+    int distance = duration * 0.034 / 2 / 10;
+    if (distance > 0 && distance < 10) {
+      Serial.print("Locul ");
+      Serial.print(i + 1);
+      Serial.println(" este liber");
+    } else {
+      Serial.print("Locul ");
+      Serial.print(i + 1);
+      Serial.println(" este ocupat");
+    }
+  }
+  delay(1000);
+}
+
+int calculDistantaIN1() {
+  digitalWrite(trigPinIN1, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPinIN1, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPinIN1, LOW);
+  durationIN1 = pulseIn(echoPinIN1, HIGH);
+  distanceIN1 = durationIN1 * 0.034 / 2;
+  return distanceIN1;
+}
+
+int calculDistantaIN2() {
+  digitalWrite(trigPinIN2, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPinIN2, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPinIN2, LOW);
+  durationIN2 = pulseIn(echoPinIN2, HIGH);
+  distanceIN2 = durationIN2 * 0.034 / 2;
+  return distanceIN2;
+}
+
+int calculDistantaOUT1() {
+  digitalWrite(trigPinOUT1, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPinOUT1, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPinOUT1, LOW);
+  durationOUT1 = pulseIn(echoPinOUT1, HIGH);
+  distanceOUT1 = durationOUT1 * 0.034 / 2
+;
+  return distanceOUT1;
+}
+
+int calculDistantaOUT2() {
+  digitalWrite(trigPinOUT2, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPinOUT2, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPinOUT2, LOW);
+  durationOUT2 = pulseIn(echoPinOUT2, HIGH);
+  distanceOUT2 = durationOUT2 * 0.034 / 2;
+  return distanceOUT2;
+}
+
+void ridicarebarieraintrare() {
+  servo_intrare.write(180);
+}
+
+void coborarebarieraintrare() {
+  servo_intrare.write(90);
+}
+
+void ridicarebarieraiesire() {
+  servo_iesire.write(180);
+}
+
+void coborarebarieraiesire() {
+  servo_iesire.write(90);
+}
+
+long measureDistance(int trigPin, int echoPin) {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  return pulseIn(echoPin, HIGH);
+}
