@@ -1,25 +1,27 @@
 #include <Servo.h>
+#include <SoftwareSerial.h>
 #include <LiquidCrystal_I2C.h>
-#include <Wire.h>
+#include  <Wire.h>
 
-#define echoPinIN1 2
-#define trigPinIN1 3
-#define echoPinIN2 7
-#define trigPinIN2 8
-#define echoPinOUT1 9
-#define trigPinOUT1 10
-#define echoPinOUT2 11
-#define trigPinOUT2 12
-
-#define NUM_SENSORS 4
-
-const int trigPins[NUM_SENSORS] = {22, 24, 26, 28}; // Modificați aceste pini la pini compatibili cu Arduino Mega
-const int echoPins[NUM_SENSORS] = {23, 25, 27, 29}; // Modificați aceste pini la pini compatibili cu Arduino Mega
+#define echoPinIN1 48
+#define trigPinIN1 49
+#define echoPinIN2 46
+#define trigPinIN2 47
+#define echoPinOUT1 44
+#define trigPinOUT1 45
+#define echoPinOUT2 42
+#define trigPinOUT2 43
+#include <Ultrasonic.h>
+Ultrasonic sensor1(3, 2);  // Trig pin, Echo pin pentru senzorul 1
+Ultrasonic sensor2(5, 4);  // Trig pin, Echo pin pentru senzorul 2
+Ultrasonic sensor3(7, 6);  // Trig pin, Echo pin pentru senzorul 3
+Ultrasonic sensor4(9, 8);  // Trig pin, Echo pin pentru senzorul 4
 
 Servo servo_intrare;
 Servo servo_iesire;
 LiquidCrystal_I2C lcd(0x27, 16, 2); // Inițializați LCD-ul I2C cu adresa 0x27 și dimensiunile 16x2
-
+SoftwareSerial espSerial(10, 11);
+String str;
 long durationIN1;
 int distanceIN1;
 long durationIN2;
@@ -30,10 +32,11 @@ long durationOUT2;
 int distanceOUT2;
 int nrlocurilibere = 4;
 int conditieintrare1 = 0, conditieintrare2 = 0, conditieiesire1 = 0, conditieiesire2 = 0;
-
+int parcare[4]={1,1,1,1};
 void setup() {
-  servo_intrare.attach(13);
-  servo_iesire.attach(4);
+
+  servo_intrare.attach(40);
+  servo_iesire.attach(41);
   pinMode(trigPinIN1, OUTPUT);
   pinMode(echoPinIN1, INPUT);
   pinMode(trigPinIN2, OUTPUT);
@@ -42,43 +45,97 @@ void setup() {
   pinMode(echoPinOUT1, INPUT);
   pinMode(trigPinOUT2, OUTPUT);
   pinMode(echoPinOUT2, INPUT);
-  Serial.begin(9600);
+  //Serial.begin(9600);
+  
+
   lcd.init(); // Inițializați LCD-ul
   lcd.backlight(); // Porniți iluminarea din spate a LCD-ului
   delay(1000);
-
-  for (int i = 0; i < NUM_SENSORS; i++) {
-    pinMode(trigPins[i], OUTPUT);
-    pinMode(echoPins[i], INPUT);
-  }
 }
 
 void updateLCD(int numSpaces) {
   lcd.clear(); // Ștergeți afișajul
-  if (numSpaces == 0) {
-    lcd.setCursor(0, 0);
-    lcd.print("Parcarea este");
-    lcd.setCursor(0, 1);
-    lcd.print("plina");
-  } else {
-    lcd.setCursor(0, 0);
-    lcd.print("Locuri libere:");
-    lcd.setCursor(0, 1);
-    lcd.print(numSpaces);
+if (numSpaces == 0) {
+lcd.setCursor(0, 0);
+lcd.print("Parcarea este");
+lcd.setCursor(0, 1);
+lcd.print("plina");
+} else {
+lcd.setCursor(0, 0);
+lcd.print("Locuri libere:");
+lcd.setCursor(0, 1);
+lcd.print(numSpaces);
+}
+}
+void trimiterelocuri(int vector[]) {
+ 
+   espSerial.begin(300);
+  //Serial.print("ceva ");
+  // Transmiterea vectorului prin portul serial
+  for (int i = 0; i < 4; i++) {
+    // Trimite valoarea curentă a elementului vectorului
+    espSerial.print(vector[i]);
+    // Adaugă un separator între fiecare valoare (opțional)
+    espSerial.print(" ");
   }
+  // Treci la o nouă linie pentru a separa vectorii transmiși (opțional)
+  espSerial.println();
+  // Așteaptă puțin între transmisii (opțional)
+  delay(1000);
+  espSerial.end();
 }
 
+
 void loop() {
+  float distance1 = sensor1.read();
+float distance2 = sensor2.read();
+float distance3 = sensor3.read();
+float distance4 = sensor4.read();
+
   distanceIN1 = calculDistantaIN1();
   distanceIN2 = calculDistantaIN2();
   distanceOUT1 = calculDistantaOUT1();
   distanceOUT2 = calculDistantaOUT2();
 
+if (distance1 < 10) {
+//Serial.println("Locul 1 este ocupat");
+parcare[0]=1;
+} else {
+//Serial.println("Locul 1 este liber");
+parcare[0]=0;
+}
+
+if (distance2 < 10) {
+//Serial.println("Locul 2 este ocupat");
+parcare[1]=1;
+} else {
+//Serial.println("Locul 2 este liber");
+parcare[1]=0;
+}
+
+if (distance3 < 10) {
+//Serial.println("Locul 3 este ocupat");
+parcare[2]=1;
+} else {
+//Serial.println("Locul 3 este liber");
+parcare[2]=0;
+}
+
+
+if (distance4 < 10) {
+//Serial.println("Locul 4 este ocupat");
+parcare[3]=1;
+} else {
+//Serial.println("Locul 4 este liber");
+parcare[3]=0;
+}
+ delay(1000);
+
   // Pentru poarta de intrare
   if (distanceIN1 <= 6 && distanceIN2 > 6 && nrlocurilibere >= 1) {
     ridicarebarieraintrare();
     conditieintrare1 = 1;
-    delay(100);
+    delay(1000);
   }
 
   if (distanceIN1 > 6 && distanceIN2 <= 6) {
@@ -93,9 +150,9 @@ void loop() {
     conditieintrare1 = 0;
     conditieintrare2 = 0;
     Serial.println(nrlocurilibere);
-
+    
   }
-
+  
   // Pentru poarta de la iesire
   if (distanceOUT1 <= 6 && distanceOUT2 > 6) {
     ridicarebarieraiesire();
@@ -117,26 +174,12 @@ void loop() {
     conditieiesire1 = 0;
     conditieiesire2 = 0;
     Serial.println(nrlocurilibere);
-
+    
   }
 
   // Actualizați afișajul LCD cu numărul de locuri libere
   updateLCD(nrlocurilibere);
-
-  for (int i = 0; i < NUM_SENSORS; i++) {
-    long duration = measureDistance(trigPins[i], echoPins[i]);
-    int distance = duration * 0.034 / 2 / 10;
-    if (distance > 0 && distance < 10) {
-      Serial.print("Locul ");
-      Serial.print(i + 1);
-      Serial.println(" este liber");
-    } else {
-      Serial.print("Locul ");
-      Serial.print(i + 1);
-      Serial.println(" este ocupat");
-    }
-  }
-  delay(1000);
+  trimiterelocuri(parcare);
 }
 
 int calculDistantaIN1() {
@@ -168,8 +211,7 @@ int calculDistantaOUT1() {
   delayMicroseconds(10);
   digitalWrite(trigPinOUT1, LOW);
   durationOUT1 = pulseIn(echoPinOUT1, HIGH);
-  distanceOUT1 = durationOUT1 * 0.034 / 2
-;
+  distanceOUT1 = durationOUT1 * 0.034 / 2;
   return distanceOUT1;
 }
 
@@ -198,13 +240,4 @@ void ridicarebarieraiesire() {
 
 void coborarebarieraiesire() {
   servo_iesire.write(90);
-}
-
-long measureDistance(int trigPin, int echoPin) {
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-  return pulseIn(echoPin, HIGH);
 }
