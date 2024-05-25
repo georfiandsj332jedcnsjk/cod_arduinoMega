@@ -20,7 +20,7 @@ Ultrasonic sensor4(9, 8);  // Trig pin, Echo pin pentru senzorul 4
 Servo servo_intrare;
 Servo servo_iesire;
 LiquidCrystal_I2C lcd(0x27, 16, 2); // Inițializați LCD-ul I2C cu adresa 0x27 și dimensiunile 16x2
-SoftwareSerial espSerial(10, 11);
+SoftwareSerial espSerial(15, 14);
 String str;
 long durationIN1;
 int distanceIN1;
@@ -68,21 +68,24 @@ lcd.print(numSpaces);
 }
 }
 void trimiterelocuri(int vector[]) {
- 
    espSerial.begin(300);
+   Serial.flush();
+   delay(50);
   //Serial.print("ceva ");
   // Transmiterea vectorului prin portul serial
   for (int i = 0; i < 4; i++) {
     // Trimite valoarea curentă a elementului vectorului
     espSerial.print(vector[i]);
     // Adaugă un separator între fiecare valoare (opțional)
+    delay(50);
     espSerial.print(" ");
+    delay(50);
   }
+  Serial.flush();
   // Treci la o nouă linie pentru a separa vectorii transmiși (opțional)
-  espSerial.println();
   // Așteaptă puțin între transmisii (opțional)
-  delay(1000);
   espSerial.end();
+  delay(10000);
 }
 
 
@@ -173,7 +176,7 @@ parcare[3]=0;
       nrlocurilibere = 4;
     conditieiesire1 = 0;
     conditieiesire2 = 0;
-    Serial.println(nrlocurilibere);
+   // Serial.println(nrlocurilibere);
     
   }
 
